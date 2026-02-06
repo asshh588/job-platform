@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>{% block title %}منصة الوظائف{% endblock %}</title>
+  <title>{% block title %}درب للوظائف{% endblock %}</title>
 
   <!-- Google Font: Tajawal -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,58 +18,55 @@
       theme: {
         extend: {
           fontFamily: {
-            'tajawal': ['Tajawal', 'sans-serif'],
+            tajawal: ['Tajawal', 'sans-serif'],
           },
           colors: {
             primary: {
-              50: '#eff6ff',
-              100: '#dbeafe',
-              200: '#bfdbfe',
-              300: '#93c5fd',
-              400: '#60a5fa',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
-              800: '#1e40af',
-              900: '#1e3a8a',
-            }
+              600: '#088395',   // اللون الأساسي
+              700: '#09637E',   // الهيدر
+            },
+            secondary: {
+              400: '#7AB2B2',
+            },
+            soft: '#EBF4F6',     // خلفيات
           }
         }
       }
     }
   </script>
+
   <style>
     * { font-family: 'Tajawal', sans-serif; }
   </style>
 </head>
 
-<body class="bg-gray-50 min-h-screen flex flex-col">
+<body class="bg-soft min-h-screen flex flex-col">
 
   <!-- Header -->
-  <header class="bg-white border-b border-gray-100">
+  <header class="bg-primary-700 border-b border-primary-600">
     <div class="max-w-6xl mx-auto px-6 py-5">
       <div class="flex items-center justify-between">
         <div>
-          <a href="{% url 'job_list' %}" class="text-2xl font-bold text-primary-600">
-            منصة الوظائف
+          <a href="{% url 'job_list' %}" class="text-2xl font-extrabold text-white">
+            درب للوظائف
           </a>
-          <p class="text-sm text-gray-500 mt-0.5">اكتشف فرص العمل المناسبة لك</p>
+          <p class="text-sm text-secondary-400 mt-0.5">
+            جمعنا لك مواقع التوظيف في مكان واحد
+          </p>
         </div>
 
         <nav class="hidden md:flex items-center gap-8">
-          <a href="{% url 'job_list' %}" class="text-gray-600 hover:text-primary-600 transition-colors font-medium">
+          <a href="{% url 'job_list' %}" class="text-white/80 hover:text-white transition-colors font-medium">
             الوظائف
-          </a>
-          <!-- خله لاحقًا إذا سويت صفحة about -->
-          <a href="#" class="text-gray-600 hover:text-primary-600 transition-colors font-medium">
-            عن المنصة
-          </a>
+          <a href="{% url 'about' %}" class="text-white/80 hover:text-white transition-colors font-medium">
+  عن المنصة
+</a>
         </nav>
       </div>
     </div>
   </header>
 
-  <!-- Main Content Area -->
+  <!-- Main Content -->
   <main class="flex-1">
     <div class="max-w-6xl mx-auto px-6 py-12">
       {% block content %}{% endblock %}
@@ -77,11 +74,11 @@
   </main>
 
   <!-- Footer -->
-  <footer class="bg-white border-t border-gray-100 mt-auto">
+  <footer class="bg-white border-t border-primary-600/20 mt-auto">
     <div class="max-w-6xl mx-auto px-6 py-8">
       <div class="flex flex-col md:flex-row items-center justify-between gap-4">
         <div class="text-gray-500 text-sm">
-          © {{ now|date:"Y" }} منصة الوظائف. جميع الحقوق محفوظة.
+          © {{ now|date:"Y" }} درب للوظائف. جميع الحقوق محفوظة.
         </div>
         <div class="flex items-center gap-6 text-sm">
           <a href="#" class="text-gray-500 hover:text-primary-600 transition-colors">سياسة الخصوصية</a>

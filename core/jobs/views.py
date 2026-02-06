@@ -31,3 +31,7 @@ def job_list(request):
 def job_detail(request, slug):
     job = get_object_or_404(Job, slug=slug, is_active=True)
     return render(request, "jobs/job_detail.html", {"job": job})
+from django.shortcuts import render
+
+def about(request):
+    return render(request, "about.html")
