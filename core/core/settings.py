@@ -47,6 +47,7 @@ INSTALLED_APPS = [
 
     # Local apps
     'jobs',
+    'accounts',
 ]
 
 
@@ -146,3 +147,6 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Asia/Riyadh"
+# Authentication redirects
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"

@@ -22,5 +22,6 @@ urlpatterns = [
 
     path('', include('jobs.urls')),      # 👈 الواجهة (Frontend)
     path('api/', include('jobs.urls')),  # 👈 الـ API (Backend)
+    path("accounts/", include("accounts.urls")),
 ]
 

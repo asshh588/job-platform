@@ -56,12 +56,34 @@
         </div>
 
         <nav class="hidden md:flex items-center gap-8">
-          <a href="{% url 'job_list' %}" class="text-white/80 hover:text-white transition-colors font-medium">
-            الوظائف
-          <a href="{% url 'about' %}" class="text-white/80 hover:text-white transition-colors font-medium">
-  عن المنصة
-</a>
-        </nav>
+
+  <a href="{% url 'job_list' %}"
+     class="text-white/80 hover:text-white transition-colors font-medium">
+    الوظائف
+  </a>
+
+  <a href="{% url 'about' %}"
+     class="text-white/80 hover:text-white transition-colors font-medium">
+    عن المنصة
+  </a>
+
+  {% if user.is_authenticated %}
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button type="submit"
+              class="text-white/80 hover:text-white transition-colors font-medium">
+        تسجيل الخروج
+      </button>
+    </form>
+  {% else %}
+    <a href="{% url 'login' %}"
+       class="text-white/80 hover:text-white transition-colors font-medium">
+      تسجيل الدخول
+    </a>
+  {% endif %}
+
+</nav>
+
       </div>
     </div>
   </header>
