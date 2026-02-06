@@ -7,7 +7,7 @@ def job_list(request):
     q = request.GET.get("q", "")
     source = request.GET.get("source", "")
 
-    jobs = Job.objects.all().order_by("-created_at")
+    jobs = Job.objects.filter(is_active=True).order_by("-created_at")
 
     if q:
         jobs = jobs.filter(title__icontains=q)
@@ -20,17 +20,14 @@ def job_list(request):
     page_obj = paginator.get_page(page_number)
 
     context = {
-        "jobs": page_obj,
-        "page_obj": page_obj,
+        "jobs": page_obj,      # استخدمه في القالب كـ jobs
+        "page_obj": page_obj,  # للـ pagination
         "q": q,
         "source": source,
     }
     return render(request, "jobs/job_list.html", context)
 
 
-def job_detail(request, pk):
-    job = get_object_or_404(Job, pk=pk)
-
-    return render(request, "jobs/job_detail.html", {
-        "job": job
-    })
+def job_detail(request, slug):
+    job = get_object_or_404(Job, slug=slug, is_active=True)
+    return render(request, "jobs/job_detail.html", {"job": job})
