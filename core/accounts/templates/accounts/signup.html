@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}تسجيل الدخول | درب للوظائف{% endblock %}
+{% block title %}إنشاء حساب | درب للوظائف{% endblock %}
 
 {% block content %}
 <div class="min-h-[60vh] flex items-center justify-center">
@@ -8,7 +8,7 @@
   <div class="w-full max-w-md bg-white rounded-2xl shadow-sm p-8">
 
     <h1 class="text-2xl font-bold text-primary-700 text-center mb-6">
-      تسجيل الدخول
+      إنشاء حساب جديد
     </h1>
 
     <form method="post" class="space-y-4">
@@ -20,22 +20,30 @@
       </div>
 
       <div>
+        <label class="block text-sm text-gray-600 mb-1">البريد الإلكتروني</label>
+        {{ form.email }}
+      </div>
+
+      <div>
         <label class="block text-sm text-gray-600 mb-1">كلمة المرور</label>
-        {{ form.password }}
+        {{ form.password1 }}
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">تأكيد كلمة المرور</label>
+        {{ form.password2 }}
       </div>
 
       <button type="submit"
               class="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg font-medium transition">
-        دخول
+        إنشاء الحساب
       </button>
     </form>
 
-    <!-- رابط التسجيل -->
     <p class="text-sm text-gray-500 text-center mt-4">
-      ليس لديك حساب؟
-      <a href="{% url 'signup' %}"
-         class="text-primary-600 hover:underline font-medium">
-        إنشاء حساب جديد
+      لديك حساب؟
+      <a href="{% url 'login' %}" class="text-primary-600 hover:underline">
+        تسجيل الدخول
       </a>
     </p>
 
