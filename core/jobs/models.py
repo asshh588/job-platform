@@ -17,13 +17,13 @@ class Job(models.Model):
 
     source = models.CharField(max_length=20, choices=Source.choices, db_index=True)
 
-    # اختياري لبعض المصادر (لو توفر)
+    # اختياري لبعض المصادر
     external_id = models.CharField(max_length=255, blank=True, default="", db_index=True)
 
-    # صفحة الإعلان في المصدر (JobZaty/Ewdifh...)
+    # صفحة الإعلان في المصدر
     url = models.URLField(max_length=800)
 
-    # رابط التقديم المباشر (جهة التوظيف/LinkedIn view/شركة...)
+    # رابط التقديم
     apply_url = models.URLField(max_length=800, blank=True, default="")
 
     posted_at = models.DateField(null=True, blank=True, db_index=True)
@@ -31,10 +31,25 @@ class Job(models.Model):
     fetched_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Slug فريد للواجهة
+    # Slug فريد
     slug = models.SlugField(max_length=320, unique=True, blank=True)
 
     is_active = models.BooleanField(default=True, db_index=True)
+
+    # ⚠️ وصف تقليدي (قد يكون فارغ لبعض المصادر مثل ewdifh)
+    description = models.TextField(blank=True, null=True)
+
+    # ✅ النص الخام المستخرج من <article> (للـ AI)
+    raw_text = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Raw text extracted from source article (used for AI processing)"
+    )
+
+    # ✅ مخرجات الـ AI
+    ai_summary = models.TextField(blank=True, null=True, help_text="AI-generated job summary")
+    ai_skills = models.JSONField(blank=True, null=True, help_text="AI-extracted skills list")
+    ai_generated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ["-posted_at", "-id"]
@@ -43,7 +58,6 @@ class Job(models.Model):
             models.Index(fields=["is_active", "posted_at"]),
         ]
         constraints = [
-            # يمنع تكرار نفس الوظيفة من نفس المصدر حسب رابطها
             models.UniqueConstraint(fields=["source", "url"], name="uniq_job_source_url"),
         ]
 

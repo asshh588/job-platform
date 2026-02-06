@@ -80,39 +80,75 @@
 
   </div>
 
-  <!-- Info Box -->
-  <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-8">
-    <div class="flex items-start gap-3">
-      <span class="text-amber-500 text-xl mt-0.5">ℹ️</span>
-      <div>
-        <p class="text-amber-800 font-medium mb-1">
-          تفاصيل الوظيفة الكاملة في موقع المصدر
-        </p>
-        <p class="text-amber-700 text-sm">
-          للاطلاع على الوصف الكامل والمتطلبات والتقديم، يرجى زيارة الموقع الأصلي.
-        </p>
+  {# ===================== #}
+  {# محتوى الوصف الذكي #}
+  {# ===================== #}
+
+  {% if job.ai_summary %}
+    <!-- AI Summary -->
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
+      <h3 class="text-lg font-bold text-blue-800 mb-3">ملخص الوظيفة</h3>
+      <p class="text-blue-900 leading-relaxed">
+        {{ job.ai_summary|linebreaks }}
+      </p>
+
+      {% if job.ai_skills %}
+        <div class="mt-5">
+          <h4 class="text-sm font-semibold text-blue-800 mb-2">
+            المهارات المطلوبة
+          </h4>
+          <div class="flex flex-wrap gap-2">
+            {% for skill in job.ai_skills %}
+              <span class="bg-white border border-blue-200 text-blue-800
+                           px-3 py-1 rounded-full text-sm font-medium">
+                {{ skill }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+  {% elif job.description %}
+    <!-- Fallback Description -->
+    <div class="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-8">
+      {{ job.description|linebreaks }}
+    </div>
+
+  {% else %}
+    <!-- Info Box (Only if no AI & no description) -->
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-8">
+      <div class="flex items-start gap-3">
+        <span class="text-amber-500 text-xl mt-0.5">ℹ️</span>
+        <div>
+          <p class="text-amber-800 font-medium mb-1">
+            تفاصيل الوظيفة الكاملة في موقع المصدر
+          </p>
+          <p class="text-amber-700 text-sm">
+            للاطلاع على الوصف الكامل والمتطلبات والتقديم، يرجى زيارة الموقع الأصلي.
+          </p>
+        </div>
       </div>
     </div>
-  </div>
+  {% endif %}
 
   <!-- Actions -->
   <div class="flex flex-col sm:flex-row gap-4">
 
-    <!-- External Source (الزر الصحيح) -->
-<a
-  href="{{ job.apply_url|default:job.url }}"
-  target="_blank"
-  rel="noopener noreferrer"
-  class="flex-1 inline-flex items-center justify-center gap-2
-         bg-primary-600 hover:bg-primary-700
-         text-white px-8 py-4 rounded-xl
-         font-medium transition-colors
-         shadow-lg shadow-primary-600/20 text-lg"
->
-  التقديم على الوظيفة
-  <span class="text-xl">←</span>
-</a>
-
+    <!-- External Source -->
+    <a
+      href="{{ job.apply_url|default:job.url }}"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="flex-1 inline-flex items-center justify-center gap-2
+             bg-primary-600 hover:bg-primary-700
+             text-white px-8 py-4 rounded-xl
+             font-medium transition-colors
+             shadow-lg shadow-primary-600/20 text-lg"
+    >
+      التقديم على الوظيفة
+      <span class="text-xl">←</span>
+    </a>
 
     <!-- Copy Link -->
     <button

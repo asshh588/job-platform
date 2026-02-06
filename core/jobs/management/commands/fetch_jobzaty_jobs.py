@@ -11,6 +11,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from jobs.models import Job
+from jobs.tasks import generate_ai_job_summary  # ✅ AI task
 
 
 BASE_URL = "https://www.jobzaty.com"
@@ -28,7 +29,7 @@ def build_list_url(page: int) -> str:
 def extract_apply_url(session, soup, timeout=20):
     """
     استخراج رابط التقديم الحقيقي من صفحة JobZaty
-    مع استبعاد السوشال والـ blog
+    مع استبعاد السوشيال والـ blog
     """
 
     def is_blog(u):
@@ -76,6 +77,20 @@ def extract_apply_url(session, soup, timeout=20):
     return candidates[0][1]
 
 
+def extract_job_description(soup):
+    """
+    استخراج الوصف النصي للوظيفة من صفحة JobZaty
+    """
+    container = soup.select_one(
+        "div.job-description, div.content, article, section"
+    )
+    if not container:
+        return ""
+
+    text = container.get_text(separator="\n", strip=True)
+    return text[:8000]
+
+
 def parse_job_detail(session, job_url, timeout=25):
     r = session.get(job_url, timeout=timeout)
     r.raise_for_status()
@@ -104,6 +119,7 @@ def parse_job_detail(session, job_url, timeout=25):
     location = ""
 
     apply_url = extract_apply_url(session, soup, timeout)
+    description = extract_job_description(soup)
 
     return {
         "title": title,
@@ -111,6 +127,7 @@ def parse_job_detail(session, job_url, timeout=25):
         "location": location,
         "url": job_url,
         "apply_url": apply_url,
+        "description": description,
     }
 
 
@@ -168,17 +185,24 @@ def fetch_jobzaty_jobs(pages=1, sleep_seconds=1.0, timeout=25, debug=False):
         with transaction.atomic():
             for j in jobs_data:
                 obj, created = Job.objects.update_or_create(
-                    source="jobzaty",
+                    source=Job.Source.JOBZATY,
                     url=j["url"],
                     defaults={
                         "title": j["title"],
                         "company": j["company"],
                         "location": j["location"],
                         "apply_url": j["apply_url"],
+                        "description": j.get("description", ""),
+                        "is_active": True,
                     },
                 )
+
                 summary["created"] += int(created)
                 summary["updated"] += int(not created)
+
+                # ✅ المرحلة 4: تشغيل التوليد بالذكاء الاصطناعي
+                if created or not obj.ai_summary:
+                    generate_ai_job_summary.delay(obj.id)
 
         time.sleep(sleep_seconds)
 
