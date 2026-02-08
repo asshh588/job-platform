@@ -45,3 +45,10 @@ def generate_ai_job_summary(self, job_id: int):
     job.save(update_fields=["ai_summary", "ai_skills", "ai_generated_at"])
 
     return "AI summary generated"
+@shared_task
+def fetch_all_jobs_task():
+    """
+    Temporary test task to verify Celery + Beat execution
+    """
+    print("✅ Fetch all jobs task executed")
+    return "fetch_all_jobs_task ran successfully"

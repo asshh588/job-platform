@@ -15,7 +15,6 @@
   <section class="bg-white border border-gray-100 shadow-sm rounded-2xl -mt-6 relative z-10">
     <div class="px-6 py-6">
       <form method="get" class="flex flex-col md:flex-row gap-4">
-        <!-- Search Input -->
         <div class="flex-1">
           <input
             type="text"
@@ -26,7 +25,6 @@
           >
         </div>
 
-        <!-- Source Dropdown -->
         <div class="md:w-52">
           <select
             name="source"
@@ -34,11 +32,11 @@
           >
             <option value="" {% if not source %}selected{% endif %}>جميع المصادر</option>
             <option value="jadarah" {% if source == "jadarah" %}selected{% endif %}>جدارات</option>
-            <option value="rss_wrw" {% if source == "rss_wrw" %}selected{% endif %}>RSS (WRW)</option>
+            <option value="jobzaty" {% if source == "jobzaty" %}selected{% endif %}>JobZaty</option>
+            <option value="ewdifh" {% if source == "ewdifh" %}selected{% endif %}>أي وظيفة</option>
           </select>
         </div>
 
-        <!-- Submit Button -->
         <button
           type="submit"
           class="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3.5 rounded-lg font-medium transition-colors shadow-lg shadow-primary-600/20"
@@ -52,7 +50,6 @@
   <!-- Jobs List Section -->
   <section class="px-0 py-10">
 
-    <!-- Results Header -->
     <div class="flex items-center justify-between mb-8">
       <h3 class="text-xl font-bold text-gray-800">الوظائف المتاحة</h3>
 
@@ -64,7 +61,6 @@
       {% endif %}
     </div>
 
-    <!-- Jobs Grid -->
     <div class="grid gap-5">
       {% for job in jobs %}
         <article class="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg hover:border-gray-200 transition-all group">
@@ -83,28 +79,30 @@
               </div>
 
               <div class="flex flex-wrap items-center gap-4 text-gray-500 text-sm">
+
                 <span class="flex items-center gap-1.5">
                   <span class="w-1 h-1 bg-gray-400 rounded-full"></span>
                   {{ job.company }}
                 </span>
 
+                {% if job.location %}
                 <span class="flex items-center gap-1.5">
                   <span class="w-1 h-1 bg-gray-400 rounded-full"></span>
                   {{ job.location }}
                 </span>
+                {% endif %}
 
+                {# ✅ تاريخ المصدر فقط (لا نعرض created_at) #}
+                {% if job.posted_at %}
                 <span class="flex items-center gap-1.5">
                   <span class="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  {% if job.posted_at %}
-                    {{ job.posted_at }}
-                  {% else %}
-                    تاريخ غير متوفر
-                  {% endif %}
+                  {{ job.posted_at|date:"Y-m-d" }}
                 </span>
+                {% endif %}
+
               </div>
             </div>
 
-            <!-- CTA -> internal detail page -->
             <a href="{% url 'job_detail' job.slug %}"
                class="inline-flex items-center justify-center bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors text-sm whitespace-nowrap">
               عرض التفاصيل
@@ -122,12 +120,12 @@
       {% endfor %}
     </div>
 
-    <!-- Pagination (dynamic) -->
+    <!-- ✅ Pagination (مهم جدًا) -->
     {% if page_obj and page_obj.has_other_pages %}
       <nav class="flex items-center justify-center gap-2 mt-10" aria-label="Pagination">
 
         {% if page_obj.has_previous %}
-          <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&source={{ source }}"
+          <a href="?page={{ page_obj.previous_page_number }}&q={{ q|urlencode }}&source={{ source|urlencode }}"
              class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all">
             →
           </a>
@@ -139,7 +137,7 @@
               {{ num }}
             </span>
           {% elif num >= page_obj.number|add:'-2' and num <= page_obj.number|add:'2' %}
-            <a href="?page={{ num }}&q={{ q }}&source={{ source }}"
+            <a href="?page={{ num }}&q={{ q|urlencode }}&source={{ source|urlencode }}"
                class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-medium">
               {{ num }}
             </a>
@@ -147,7 +145,7 @@
         {% endfor %}
 
         {% if page_obj.has_next %}
-          <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&source={{ source }}"
+          <a href="?page={{ page_obj.next_page_number }}&q={{ q|urlencode }}&source={{ source|urlencode }}"
              class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all">
             ←
           </a>

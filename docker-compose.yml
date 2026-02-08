@@ -1,0 +1,35 @@
+services:
+  web:
+    build: ./core
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./core:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: ./core
+    command: celery -A core worker -l info
+    volumes:
+      - ./core:/app
+    depends_on:
+      - redis
+      - web
+
+  celery-beat:
+    build: ./core
+    command: >
+      celery -A core beat
+      -l info
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./core:/app
+    depends_on:
+      - redis

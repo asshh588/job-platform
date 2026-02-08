@@ -2,6 +2,7 @@
 
 import re
 import time
+from datetime import datetime
 from urllib.parse import urljoin
 
 import requests
@@ -9,14 +10,19 @@ from bs4 import BeautifulSoup
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
 from jobs.models import Job
-from jobs.tasks import generate_ai_job_summary  # ✅ AI task
+from jobs.tasks import generate_ai_job_summary
 
 
 BASE_URL = "https://www.jobzaty.com"
 LIST_PATH = "/jobs"
 
+
+# =========================
+# Helpers
+# =========================
 
 def _clean_text(x: str) -> str:
     return re.sub(r"\s+", " ", (x or "").strip())
@@ -26,12 +32,45 @@ def build_list_url(page: int) -> str:
     return f"{BASE_URL}{LIST_PATH}?page={page}"
 
 
-def extract_apply_url(session, soup, timeout=20):
+def extract_posted_date_from_jsonld(soup):
     """
-    استخراج رابط التقديم الحقيقي من صفحة JobZaty
-    مع استبعاد السوشيال والـ blog
+    استخراج تاريخ النشر من JSON-LD
+    يدعم:
+    - datePosted
+    - datePublished
     """
+    for s in soup.find_all("script", type="application/ld+json"):
+        text = s.string
+        if not text:
+            continue
 
+        m = re.search(
+            r'"date(Post(ed)?|Published)"\s*:\s*"([^"]+)"',
+            text,
+        )
+        if not m:
+            continue
+
+        raw_date = m.group(3)
+
+        try:
+            # مثال: 2024-01-26
+            if len(raw_date) == 10:
+                return datetime.strptime(raw_date, "%Y-%m-%d").date()
+
+            # مثال: 2024-01-26T00:00:00+03:00
+            return datetime.fromisoformat(raw_date.replace("Z", "")).date()
+        except Exception:
+            continue
+
+    return None
+
+
+# =========================
+# Extractors
+# =========================
+
+def extract_apply_url(session, soup):
     def is_blog(u):
         return "/blog/" in (u or "").lower()
 
@@ -57,7 +96,7 @@ def extract_apply_url(session, soup, timeout=20):
             continue
 
         text = _clean_text(a.get_text(" ", strip=True)).lower()
-        if not any(k in text for k in ["التقديم", "قدم", "اضغط", "apply", "source"]):
+        if not any(k in text for k in ["التقديم", "قدم", "apply"]):
             continue
 
         score = 0
@@ -78,58 +117,52 @@ def extract_apply_url(session, soup, timeout=20):
 
 
 def extract_job_description(soup):
-    """
-    استخراج الوصف النصي للوظيفة من صفحة JobZaty
-    """
     container = soup.select_one(
         "div.job-description, div.content, article, section"
     )
     if not container:
         return ""
 
-    text = container.get_text(separator="\n", strip=True)
-    return text[:8000]
+    return container.get_text(separator="\n", strip=True)[:8000]
 
+
+# =========================
+# Job Detail
+# =========================
 
 def parse_job_detail(session, job_url, timeout=25):
     r = session.get(job_url, timeout=timeout)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # Title
     h1 = soup.find("h1")
     title = _clean_text(h1.get_text(strip=True)) if h1 else ""
     if not title:
         return None
 
-    # Company
     company = ""
     img = soup.find("img", alt=True)
     if img:
         company = _clean_text(img.get("alt", ""))
 
-    if not company:
-        for el in soup.find_all(["h2", "h3", "p", "span", "div"], limit=40):
-            t = _clean_text(el.get_text(" ", strip=True))
-            if t and t != title and len(t) <= 80:
-                company = t
-                break
-
-    # Location (بسيط)
-    location = ""
-
-    apply_url = extract_apply_url(session, soup, timeout)
+    posted_at = extract_posted_date_from_jsonld(soup)
+    apply_url = extract_apply_url(session, soup)
     description = extract_job_description(soup)
 
     return {
         "title": title,
         "company": company or "غير محدد",
-        "location": location,
+        "location": "",
         "url": job_url,
         "apply_url": apply_url,
         "description": description,
+        "posted_at": posted_at,
     }
 
+
+# =========================
+# Fetcher
+# =========================
 
 def fetch_jobzaty_jobs(pages=1, sleep_seconds=1.0, timeout=25, debug=False):
     session = requests.Session()
@@ -138,38 +171,17 @@ def fetch_jobzaty_jobs(pages=1, sleep_seconds=1.0, timeout=25, debug=False):
         "Accept-Language": "ar,en;q=0.9",
     })
 
-    summary = {
-        "fetched_pages": 0,
-        "list_job_links": 0,
-        "parsed_jobs": 0,
-        "created": 0,
-        "updated": 0,
-        "errors": [],
-    }
-
     for page in range(1, pages + 1):
-        list_url = build_list_url(page)
+        soup = BeautifulSoup(
+            session.get(build_list_url(page), timeout=timeout).text,
+            "html.parser",
+        )
 
-        try:
-            r = session.get(list_url, timeout=timeout)
-            r.raise_for_status()
-        except Exception as e:
-            summary["errors"].append({"stage": "list", "page": page, "error": str(e)})
-            continue
-
-        summary["fetched_pages"] += 1
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        job_links = set()
-        for a in soup.select("a[href]"):
-            href = (a.get("href") or "").strip()
-            if "/job/" in href:
-                job_links.add(urljoin(BASE_URL, href))
-
-        summary["list_job_links"] += len(job_links)
-
-        if debug:
-            print(f"[DEBUG] page={page} job_links={len(job_links)}")
+        job_links = {
+            urljoin(BASE_URL, a["href"])
+            for a in soup.select("a[href]")
+            if "/job/" in a["href"]
+        }
 
         jobs_data = []
         for job_url in job_links:
@@ -177,10 +189,8 @@ def fetch_jobzaty_jobs(pages=1, sleep_seconds=1.0, timeout=25, debug=False):
                 data = parse_job_detail(session, job_url, timeout)
                 if data:
                     jobs_data.append(data)
-            except Exception as e:
-                summary["errors"].append({"stage": "detail", "url": job_url, "error": str(e)})
-
-        summary["parsed_jobs"] += len(jobs_data)
+            except Exception:
+                continue
 
         with transaction.atomic():
             for j in jobs_data:
@@ -192,38 +202,30 @@ def fetch_jobzaty_jobs(pages=1, sleep_seconds=1.0, timeout=25, debug=False):
                         "company": j["company"],
                         "location": j["location"],
                         "apply_url": j["apply_url"],
-                        "description": j.get("description", ""),
+                        "description": j["description"],
+                        "posted_at": j["posted_at"],
                         "is_active": True,
+                        "last_seen_at": timezone.now(),
                     },
                 )
 
-                summary["created"] += int(created)
-                summary["updated"] += int(not created)
-
-                # ✅ المرحلة 4: تشغيل التوليد بالذكاء الاصطناعي
                 if created or not obj.ai_summary:
                     generate_ai_job_summary.delay(obj.id)
 
         time.sleep(sleep_seconds)
 
-    return summary
 
+# =========================
+# Django Command
+# =========================
 
 class Command(BaseCommand):
     help = "Fetch jobs from JobZaty"
 
     def add_arguments(self, parser):
         parser.add_argument("--pages", type=int, default=1)
-        parser.add_argument("--sleep", type=float, default=1.0)
-        parser.add_argument("--timeout", type=int, default=25)
-        parser.add_argument("--debug", action="store_true")
 
     def handle(self, *args, **options):
         self.stdout.write("Fetching JobZaty jobs...")
-        res = fetch_jobzaty_jobs(
-            pages=options["pages"],
-            sleep_seconds=options["sleep"],
-            timeout=options["timeout"],
-            debug=options["debug"],
-        )
-        self.stdout.write(self.style.SUCCESS(str(res)))
+        fetch_jobzaty_jobs(pages=options["pages"])
+        self.stdout.write(self.style.SUCCESS("Done"))

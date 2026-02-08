@@ -2,6 +2,7 @@
 
 import re
 import time
+from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -9,6 +10,7 @@ from bs4 import BeautifulSoup
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
 from jobs.models import Job
 from jobs.tasks import generate_ai_job_summary
@@ -17,6 +19,8 @@ from jobs.tasks import generate_ai_job_summary
 BASE_URL = "https://www.ewdifh.com"
 LIST_URL = f"{BASE_URL}/category/all-jobs"
 
+
+# ----------------- Helpers -----------------
 
 def clean(x: str) -> str:
     return re.sub(r"\s+", " ", (x or "").strip())
@@ -31,6 +35,27 @@ def is_denied_url(u: str) -> bool:
     ]
     return any(d in low for d in deny)
 
+
+def extract_date_from_text(text: str):
+    """
+    يستخرج تاريخ بصيغة DD-MM-YYYY من أي نص
+    مثال: وظائف شركات 05-02-2026
+    """
+    if not text:
+        return None
+
+    m = re.search(r"(\d{2})-(\d{2})-(\d{4})", text)
+    if not m:
+        return None
+
+    day, month, year = map(int, m.groups())
+    try:
+        return datetime(year, month, day).date()
+    except ValueError:
+        return None
+
+
+# ----------------- Detail Parser -----------------
 
 def parse_job_detail(
     session: requests.Session,
@@ -62,7 +87,7 @@ def parse_job_detail(
 
     location = ""
 
-    # ---------- RAW TEXT (المهم) ----------
+    # ---------- RAW TEXT ----------
     raw_text = ""
     main = soup.find("main")
     if main:
@@ -112,6 +137,9 @@ def parse_job_detail(
         candidates.sort(key=lambda x: x[0], reverse=True)
         apply_url = candidates[0][1]
 
+    # ✅ استخراج تاريخ المصدر الحقيقي
+    posted_at = extract_date_from_text(company)
+
     return {
         "title": title,
         "company": company,
@@ -119,8 +147,11 @@ def parse_job_detail(
         "url": job_url,
         "apply_url": apply_url,
         "raw_text": raw_text,
+        "posted_at": posted_at,
     }
 
+
+# ----------------- Main Fetcher -----------------
 
 def fetch_ewdifh_jobs(
     pages: int = 1,
@@ -131,9 +162,7 @@ def fetch_ewdifh_jobs(
     session = requests.Session()
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (compatible; JobPlatformBot/1.0)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
-        "Connection": "keep-alive",
+        "Accept-Language": "ar,en;q=0.9",
     })
 
     for page in range(1, pages + 1):
@@ -146,12 +175,8 @@ def fetch_ewdifh_jobs(
         job_links = set()
         for a in soup.select("a[href]"):
             href = (a.get("href") or "").strip()
-            if not href:
-                continue
-
-            abs_url = urljoin(BASE_URL, href)
-            if re.search(r"/jobs/\d+/?$", abs_url):
-                job_links.add(abs_url)
+            if href and re.search(r"/jobs/\d+/?$", href):
+                job_links.add(urljoin(BASE_URL, href))
 
         jobs_data = []
         for job_url in job_links:
@@ -165,6 +190,8 @@ def fetch_ewdifh_jobs(
 
         with transaction.atomic():
             for j in jobs_data:
+                posted_at = j["posted_at"] or timezone.now().date()
+
                 obj, _ = Job.objects.update_or_create(
                     source=Job.Source.EWDIFH,
                     url=j["url"],
@@ -173,18 +200,17 @@ def fetch_ewdifh_jobs(
                         "company": j["company"],
                         "location": j["location"],
                         "apply_url": j.get("apply_url", ""),
-                        "description": "",  # متعمد
+                        "description": "",
                         "is_active": True,
+                        "posted_at": posted_at,   # ✅ تاريخ المصدر الحقيقي
+                        "last_seen_at": timezone.now(),
                     },
                 )
 
-                # 🔥 فرض تحديث raw_text
-                raw_text = j.get("raw_text") or ""
-                if raw_text:
-                    obj.raw_text = raw_text
+                if j["raw_text"] and j["raw_text"] != obj.raw_text:
+                    obj.raw_text = j["raw_text"]
                     obj.save(update_fields=["raw_text"])
 
-                # تشغيل AI فقط عند توفر raw_text
                 if obj.raw_text and not obj.ai_summary:
                     generate_ai_job_summary.delay(obj.id)
 
@@ -192,8 +218,10 @@ def fetch_ewdifh_jobs(
             time.sleep(sleep_seconds)
 
 
+# ----------------- Django Command -----------------
+
 class Command(BaseCommand):
-    help = "Fetch jobs from ewdifh.com (أي وظيفة) and store raw_text for AI processing."
+    help = "Fetch jobs from ewdifh.com with correct source date ordering."
 
     def add_arguments(self, parser):
         parser.add_argument("--pages", type=int, default=1)
@@ -201,18 +229,9 @@ class Command(BaseCommand):
         parser.add_argument("--timeout", type=int, default=25)
 
     def handle(self, *args, **options):
-        pages = max(1, int(options["pages"]))
-        sleep_seconds = max(0.0, float(options["sleep"]))
-        timeout = max(5, int(options["timeout"]))
-
-        self.stdout.write(
-            f"Fetching Ewdifh jobs (AI-first): pages={pages}, sleep={sleep_seconds}, timeout={timeout}"
-        )
-
         fetch_ewdifh_jobs(
-            pages=pages,
-            sleep_seconds=sleep_seconds,
-            timeout=timeout,
+            pages=options["pages"],
+            sleep_seconds=options["sleep"],
+            timeout=options["timeout"],
         )
-
         self.stdout.write(self.style.SUCCESS("Done."))

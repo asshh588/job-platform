@@ -5,6 +5,7 @@ from django.utils.text import slugify
 
 
 class Job(models.Model):
+    
     class Source(models.TextChoices):
         JADARAH = "jadarah", "Jadarah"
         JOBZATY = "jobzaty", "JobZaty"
@@ -27,6 +28,8 @@ class Job(models.Model):
     apply_url = models.URLField(max_length=800, blank=True, default="")
 
     posted_at = models.DateField(null=True, blank=True, db_index=True)
+
+    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     fetched_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -78,3 +81,4 @@ class Job(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.company})"
+        
